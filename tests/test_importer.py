@@ -16,13 +16,13 @@ def sheet(tmp_path):
     for i, text in enumerate(HEAD):
         ws.cell(row=2, column=2 + i, value=text)
     rows = [
-        (1, 'Tower A', 'SF-1', 'qld', 'Pete', 'Sam', 3, None, 'As per email', 'CC: Vass'),
-        (2, None, None, 'VIC', None, None, '=9+7+(0.15*7)+1', None, 'As per SF', None),
+        (1, 'Tower A', 'SF-1', 'qld', 'Pete', 'Sam', 3, '=3*220', 'As per email', 'CC: Vass'),
+        (2, None, None, 'VIC', None, None, '=9+7+(0.15*7)+1', None, 'Good client', None),
         (3, None, None, 'QLD', None, None, '15 & counting', None, None, None),
-        (4, None, None, 'NSW', None, None, '=H6/220', None, 'IL4 ', 'Vass'),
-        (5, None, None, 'NSW', None, None, None, None, 'Good client', None),
+        (4, None, None, 'NSW', None, None, '=H6/220', 4500, 'IL4 ', 'Vass'),
+        (5, None, None, 'NSW', None, None, None, 20750, 'Change of scope - not included in quote', None),
         (None, None, None, None, None, None, None, None, None, None),
-        (None, None, None, 'nz', None, None, 0.75, None, None, None),
+        (None, None, None, 'nz', None, None, 0.75, 'tbc', 'New drawings were provided', None, None, None, 'extra note'),
     ]
     for r, values in enumerate(rows, start=3):
         for c, value in enumerate(values, start=1):
@@ -43,6 +43,10 @@ def test_read_sheet(sheet):
     assert text.hours is None and text.needs_review and text.hours_text == '15 & counting'
     assert ref.hours is None and ref.needs_review and ref.hours_text == '=H6/220'
     assert blank.hours is None and not blank.needs_review
+    # dollar column: plain numbers and pure-arithmetic formulas are read; anything else is left blank and noted
+    assert (a.amount, formula.amount, ref.amount, blank.amount, unnumbered.amount) == (660, None, 4500, 20750, None)
+    assert 'extra note' in unnumbered.remarks and 'tbc' in unnumbered.remarks
+    assert [r.category for r in rows] == ['Other', 'Good client', 'Other', 'Other', 'Change of scope', 'Revised drawings']
     assert unnumbered.name == 'Project (row 9)' and unnumbered.region == 'NZ' and unnumbered.hours == 0.75
 
 
@@ -64,6 +68,10 @@ def test_commit(sheet, tmp_path):
     assert all(e.source == 'opening' and e.date is None for e in store.live_entries())
     tower = next(p for p in store.live_projects() if p.name == 'Tower A')
     assert tower.reason_detail == 'As per email' and tower.reason_category == 'Other'
+    assert tower.opening_amount == 660
+    amounts = {p.name: p.opening_amount for p in store.live_projects()}
+    assert amounts['Project 5'] == 20750 and amounts['Project 2'] is None
+    assert next(p for p in store.live_projects() if p.name == 'Project 5').reason_category == 'Change of scope'
     assert tower.lead_engineer == 'Sam' and tower.created_by == 'Manager'
     noted = next(p for p in store.live_projects() if p.name == 'Project 3')
     assert '15 & counting' in noted.remarks

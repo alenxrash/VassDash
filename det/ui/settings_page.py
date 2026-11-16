@@ -1,13 +1,12 @@
-"""Settings: personal (name, folder, theme) and, for the manager, shared (rate, lists, passcode, import)."""
+"""Settings: personal (name, folder, theme) and shared (rate, lists, Excel import). Open to everyone."""
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtWidgets import (QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QHBoxLayout,
-                               QInputDialog, QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+                               QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 from .. import importer
-from ..auth import hash_passcode
 from ..store import Store
 from ..theme import apply_theme
 from .common import Hero, card, label
@@ -54,7 +53,7 @@ class SettingsPage(QWidget):
         box.addLayout(row)
         layout.addWidget(frame)
 
-        self.manager_card, box = card('Shared settings (manager)')
+        self.shared_card, box = card('Shared settings (apply to everyone)')
         form = QFormLayout()
         self.rate = QDoubleSpinBox()
         self.rate.setRange(0.0, 100000.0)
@@ -73,17 +72,15 @@ class SettingsPage(QWidget):
         save_shared = QPushButton('Save shared settings')
         save_shared.setObjectName('primary')
         save_shared.clicked.connect(self.save_shared)
-        passcode = QPushButton('Change passcode…')
-        passcode.clicked.connect(self.change_passcode)
         excel = QPushButton('Import from Excel…')
         excel.clicked.connect(self.import_excel)
-        for button in (save_shared, passcode, excel):
+        for button in (save_shared, excel):
             row.addWidget(button)
         row.addStretch(1)
         box.addLayout(row)
         self.shared_status = label('', 'muted')
         box.addWidget(self.shared_status)
-        layout.addWidget(self.manager_card)
+        layout.addWidget(self.shared_card)
         layout.addStretch(1)
         self.refresh()
 
@@ -94,7 +91,6 @@ class SettingsPage(QWidget):
             self.name.setText(settings.get('user_name') or '')
         self.folder.setText(str(self.win.store.directory))
         self.theme.setCurrentText(settings.get('theme') or 'dark')
-        self.manager_card.setVisible(self.win.manager)
         if not any(w.hasFocus() for w in (self.rate, self.regions, self.reasons)):
             self.rate.setValue(config.rate)
             self.fy.setCurrentIndex(max(0, min(11, config.fy_start_month - 1)))
@@ -129,21 +125,6 @@ class SettingsPage(QWidget):
         self.win.store.save_config()
         self.shared_status.setText('Shared settings saved.')
         self.win.refresh_pages()
-
-    def change_passcode(self) -> None:
-        code, ok = QInputDialog.getText(self, 'Manager passcode', 'New passcode (4 characters or more):', QLineEdit.Password)
-        if not ok:
-            return
-        if len(code) < 4:
-            QMessageBox.warning(self, 'Passcode', 'Use at least 4 characters.')
-            return
-        again, ok = QInputDialog.getText(self, 'Manager passcode', 'Repeat the passcode:', QLineEdit.Password)
-        if ok and again == code:
-            self.win.store.config.passcode_hash = hash_passcode(code)
-            self.win.store.save_config()
-            self.shared_status.setText('Passcode changed.')
-        elif ok:
-            QMessageBox.warning(self, 'Passcode', 'The two entries did not match. Nothing was changed.')
 
     def import_excel(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, 'Discounted Engineering workbook', '', 'Excel workbook (*.xlsx *.xlsm)')

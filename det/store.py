@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
-from .models import Config, Entry, Project, now_iso
+from .models import Config, Entry, Project, merge_names, now_iso
 
 MAX_MINUTES = 24 * 60
 
@@ -156,7 +156,7 @@ class Store:
         return [e for e in self.entries.values() if not e.deleted]
 
     def engineers(self) -> list[str]:
-        return sorted({e.engineer for e in self.live_entries() if e.engineer}, key=str.casefold)
+        return sorted(merge_names({e.engineer: 0 for e in self.live_entries() if e.engineer}), key=str.casefold)
 
     # ---- writing -------------------------------------------------------------------------
     def _save(self, folder: Path, record, new: bool) -> None:
@@ -172,6 +172,8 @@ class Store:
             raise ValueError('Project name is required.')
         if project.quoted_hours is not None and project.quoted_hours < 0:
             raise ValueError('Quoted hours cannot be negative.')
+        if project.opening_amount is not None and project.opening_amount < 0:
+            raise ValueError('Imported amount cannot be negative.')
         self._save(self.projects_dir, project, new)
         self.projects[project.id] = project
 

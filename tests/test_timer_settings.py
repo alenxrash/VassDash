@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-from det.auth import check_passcode, hash_passcode
 from det.settings import Settings
 from det.timer import TimerState
 
@@ -56,11 +55,3 @@ def test_settings_corrupt_file(tmp_path):
     s = Settings(path)
     s.load()
     assert s.get('theme') == 'dark'
-
-
-def test_passcode():
-    stored = hash_passcode('2468')
-    assert check_passcode('2468', stored)
-    assert not check_passcode('2469', stored)
-    assert not check_passcode('2468', '')
-    assert hash_passcode('2468') != stored

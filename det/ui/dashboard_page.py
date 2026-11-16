@@ -63,7 +63,7 @@ class DashboardPage(QWidget):
         self.note.setWordWrap(True)
         layout.addWidget(self.note)
 
-        self.top = BarList('accent', 'No discounted hours in this period')
+        self.top = BarList('accent', 'Nothing discounted in this period')
         self.over = BarList('danger', 'No project is over its quote')
         self.trend = TrendChart()
         self.trend.setFixedHeight(230)
@@ -79,7 +79,7 @@ class DashboardPage(QWidget):
         right = QVBoxLayout(rail)
         right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(18)
-        for target, title, widget, stretch in ((left, 'Top projects by discounted hours', self.top, 0),
+        for target, title, widget, stretch in ((left, 'Top projects by discounted amount', self.top, 0),
                                                (left, 'Trend', self.trend, 0),
                                                (left, 'By reason', self.by_reason, 0),
                                                (right, 'Over quote', self.over, 0), (right, 'By region', self.by_region, 0),
@@ -96,7 +96,8 @@ class DashboardPage(QWidget):
         layout.addLayout(columns)
 
         frame, box = card('Projects')
-        box.addWidget(label('Double-click a project to see the entries behind its figures.', 'faint'))
+        box.addWidget(label('Double-click a project to see its entries, edit it or delete it. New projects are added '
+                            'from Log time.', 'faint'))
         self.table = make_table(['Project', 'Region', 'Quoted h', 'Logged h (total)', 'Discounted h (period)',
                                  'Discounted $ (period)', 'Over quote'])
         self.table.doubleClicked.connect(lambda index: self.open_project(self.table.item(index.row(), 0).data(Qt.UserRole)))
@@ -139,22 +140,24 @@ class DashboardPage(QWidget):
         self.hero.set_subtitle('Every entry ever logged, including opening balances' if not period.dated else
                                f'{period.label}  ·  {period.start:%d/%m/%Y} to {period.end:%d/%m/%Y}')
         self.tiles['hours'].set(fmt_h(s.discounted_h), f'{fmt_h(s.logged_h)} logged')
-        self.tiles['amount'].set(fmt_money(s.amount), f'at ${store.config.rate:,.0f} per hour')
+        self.tiles['amount'].set(fmt_money(s.amount), f'hours at ${store.config.rate:,.0f}/h, plus imported amounts')
         self.tiles['over'].set(f'{s.over_count} of {s.quoted_count}', 'projects that have a quote')
         self.tiles['avg'].set(fmt_pct(s.avg_over_pct), 'across projects over quote')
         show_note = period.dated and s.before_tracking_h > 0
         self.note.setVisible(show_note)
         if show_note:
-            self.note.setText(f'{fmt_h(s.before_tracking_h)} of undated opening balances (imported from Excel) are not '
-                              f'in this period. Choose All time to include them.')
-        self.top.set_rows([(r.project.id, r.project.name, r.period_discounted_h, fmt_h(r.period_discounted_h))
-                           for r in s.rows if r.period_discounted_h > 0][:TOP])
+            self.note.setText(f'{fmt_h(s.before_tracking_h)} of undated opening balances and any imported dollar amounts '
+                              f'(from Excel) are not in this period. Choose All time to include them.')
+        self.top.set_rows([(r.project.id, r.project.name, r.period_amount,
+                            f'{fmt_money(r.period_amount)}  ·  {r.period_discounted_h:,.1f} h')
+                           for r in s.rows if r.period_amount > 0][:TOP])
         over = sorted((r for r in s.rows if r.over_pct is not None and r.over_pct > 0), key=lambda r: -r.over_pct)
         self.over.set_rows([(r.project.id, r.project.name, r.over_pct,
                              f'{fmt_pct(r.over_pct)}   {r.logged_h:,.1f} / {r.quoted_h:,.1f} h') for r in over][:TOP])
         self.trend.set_points(s.trend)
-        for bars, totals in ((self.by_region, s.by_region), (self.by_engineer, s.by_engineer), (self.by_reason, s.by_reason)):
-            bars.set_rows([(k, k, v, fmt_h(v)) for k, v in list(totals.items())[:TOP]])
+        for bars, totals in ((self.by_region, s.amount_by_region), (self.by_engineer, s.amount_by_engineer),
+                             (self.by_reason, s.amount_by_reason)):
+            bars.set_rows([(k, k, v, fmt_money(v)) for k, v in list(totals.items())[:TOP]])
         rows = [[r.project.name, r.project.region, ('—' if r.quoted_h is None else f'{r.quoted_h:,.2f}', r.quoted_h or 0.0),
                  (f'{r.logged_h:,.2f}', r.logged_h), (f'{r.period_discounted_h:,.2f}', r.period_discounted_h),
                  (fmt_money(r.period_amount), r.period_amount),

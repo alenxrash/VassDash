@@ -60,3 +60,19 @@ def test_empty_period(store, tmp_path):
     reports.export_xlsx(report, tmp_path / 'e.xlsx')
     reports.export_pdf(report, tmp_path / 'e.pdf')
     assert (tmp_path / 'e.pdf').stat().st_size > 0
+
+
+def test_report_uses_imported_amounts(store, tmp_path):
+    from det.models import Project
+    extra = Project(name='Amount only', region='VIC', lead_engineer='Cody', opening_amount=4500.0)
+    store.save_project(extra, new=True)
+    report = reports.build_report(store, calc.all_time())
+    # Tower A 4 h over quote + Mezzanine 5 h, at 220, plus the imported 4,500
+    assert report.headline['amount'] == pytest.approx(9 * 220 + 4500)
+    assert dict((label, amount) for label, _, amount in report.region_rows)['VIC'] == pytest.approx(4500)
+    assert dict((label, amount) for label, _, amount in report.engineer_rows)['Cody'] == pytest.approx(4500)
+    path = tmp_path / 'a.xlsx'
+    reports.export_xlsx(report, path)
+    wb = openpyxl.load_workbook(path)
+    values = {row[0].value: row[1].value for row in wb['Summary'].iter_rows() if row[0].value}
+    assert values['Discounted amount ($)'] == pytest.approx(9 * 220 + 4500)

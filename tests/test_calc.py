@@ -91,3 +91,47 @@ def test_summary():
 def test_summary_empty():
     s = calc.summarise([], [], 220.0, calc.all_time())
     assert s.discounted_h == 0 and s.rows == [] and s.trend == [] and s.avg_over_pct is None
+
+
+def test_imported_amount_replaces_rate_for_imported_hours():
+    # Sheet row: 14 h imported with a $7,080 figure (not 14 x 220), then 2 h tracked afterwards.
+    p = Project(name='A', opening_amount=7080.0)
+    es = [entry(p, None, 14, source='opening'), entry(p, '2026-11-10', 2)]
+    row = calc.project_totals(p, es, 220.0)
+    assert row.discounted_h == 16 and row.amount == pytest.approx(7080 + 2 * 220)
+    assert row.period_amount == pytest.approx(7080 + 440)                       # all time
+    november = calc.project_totals(p, es, 220.0, calc.month_of(date(2026, 11, 14)))
+    assert november.period_amount == pytest.approx(440)                         # imported amount is undated
+
+
+def test_imported_amount_without_hours():
+    p = Project(name='A', region='NSW', lead_engineer='Nathan', reason_category='Project size', opening_amount=20750.0)
+    q = Project(name='B', region='NSW')
+    es = [entry(q, None, 2, 'Sam', source='opening')]
+    s = calc.summarise([p, q], es, 220.0, calc.all_time())
+    assert s.amount == pytest.approx(20750 + 440) and s.discounted_h == pytest.approx(2)
+    assert [r.project.name for r in s.rows] == ['A', 'B']                       # ranked by dollars
+    assert s.amount_by_region == {'NSW': pytest.approx(21190)}
+    assert s.amount_by_engineer == {'Nathan': pytest.approx(20750), 'Sam': pytest.approx(440)}
+    assert s.amount_by_reason == {'Project size': pytest.approx(20750), 'Other': pytest.approx(440)}
+    only = calc.summarise([p, q], es, 220.0, calc.all_time(), engineer='Nathan')
+    assert only.amount == pytest.approx(20750) and [r.project.name for r in only.rows] == ['A']
+    dated = calc.summarise([p, q], es, 220.0, calc.month_of(date(2026, 11, 14)))
+    assert dated.amount == 0 and dated.rows == []
+
+
+def test_imported_amount_split_between_engineers_by_hours():
+    p = Project(name='A', opening_amount=1000.0)
+    es = [entry(p, None, 3, 'Sam', source='opening'), entry(p, None, 1, 'Lee', source='opening')]
+    s = calc.summarise([p], es, 220.0, calc.all_time())
+    assert s.amount_by_engineer == {'Sam': pytest.approx(750), 'Lee': pytest.approx(250)}
+
+
+def test_engineer_names_differing_only_by_case_are_one_person():
+    p = Project(name='A')
+    es = [entry(p, '2026-11-03', 2, 'NATHAN'), entry(p, '2026-11-04', 3, 'NAthan'), entry(p, '2026-11-05', 1, 'Sam H')]
+    s = calc.summarise([p], es, 220.0, calc.all_time())
+    assert s.by_engineer == {'Nathan': pytest.approx(5), 'Sam H': pytest.approx(1)}
+    assert s.amount_by_engineer == {'Nathan': pytest.approx(1100), 'Sam H': pytest.approx(220)}
+    only = calc.summarise([p], es, 220.0, calc.all_time(), engineer='Nathan')
+    assert only.discounted_h == pytest.approx(5)

@@ -10,6 +10,18 @@ from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QVBoxLayout, QWidget
 from ..theme import tokens
 
 
+def relayout(widget) -> None:
+    """Re-run the layouts above a widget whose height just changed."""
+    parent = widget.parentWidget()
+    for _ in range(5):
+        if parent is None:
+            break
+        if parent.layout() is not None:
+            parent.layout().invalidate()
+            parent.layout().activate()
+        parent = parent.parentWidget()
+
+
 class StatTile(QFrame):
     def __init__(self, title: str, hero: bool = False):
         super().__init__()
@@ -45,7 +57,8 @@ class BarList(QWidget):
 
     def set_rows(self, rows) -> None:
         self.rows = list(rows)
-        self.updateGeometry()
+        self.setFixedHeight(self.sizeHint().height())
+        relayout(self)                      # cards inside a scroll area can miss one height change
         self.update()
 
     def sizeHint(self) -> QSize:

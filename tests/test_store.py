@@ -120,3 +120,12 @@ def test_entry_with_bad_date_is_skipped(tmp_path):
     path.write_text(json.dumps(data))
     store.load()
     assert store.live_entries() == [] and len(store.warnings) == 1
+
+
+def test_engineer_list_merges_case_variants(tmp_path):
+    store = make(tmp_path)
+    p = Project(name='A')
+    store.save_project(p, new=True)
+    for who in ('NATHAN', 'NAthan', 'Cody'):
+        store.save_entry(Entry(project_id=p.id, engineer=who, date='2026-11-12', minutes=60), new=True)
+    assert store.engineers() == ['Cody', 'Nathan']

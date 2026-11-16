@@ -3,6 +3,11 @@
 Rule for overrun: a project's entries are taken in order (undated opening balances first, then by
 date and creation time). The quote is used up in that order, and only the part of an entry that
 falls after the quote has run out is discounted. With no quote, every logged hour is discounted.
+
+Rule for dollars: discounted hours are valued at the rate. Where a project carries an imported
+amount (Project.opening_amount), that figure replaces the rate for the project's imported hours,
+because the old sheet's dollar column was not always hours x rate. An imported amount has no date,
+so it counts in project totals and All time, never in a dated period.
 """
 from __future__ import annotations
 
@@ -10,7 +15,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from .models import Entry, Project
+from .models import Entry, Project, merge_names
 
 
 @dataclass(frozen=True)
@@ -104,6 +109,21 @@ class ProjectRow:
     period_amount: float = 0.0
     slices: list = field(default_factory=list)
     period_slices: list = field(default_factory=list)
+    engineer_amounts: dict = field(default_factory=dict)     # dollars in the period, by engineer
+
+
+def _imported_shares(project: Project, slices) -> dict:
+    """Who an imported amount belongs to: split by imported hours, else the lead engineer."""
+    if project.opening_amount is None:
+        return {}
+    opening = [s for s in slices if s.entry.source == 'opening']
+    total = sum(s.minutes for s in opening)
+    if total <= 0:
+        return {project.lead_engineer or 'Unassigned': project.opening_amount}
+    shares: dict = defaultdict(float)
+    for s in opening:
+        shares[s.entry.engineer or 'Unassigned'] += project.opening_amount * s.minutes / total
+    return dict(shares)
 
 
 def project_totals(project: Project, entries, rate: float, period: Period | None = None,
@@ -113,16 +133,30 @@ def project_totals(project: Project, entries, rate: float, period: Period | None
     logged = sum(s.minutes for s in slices) / 60
     quoted = project.quoted_hours if project.quoted_hours and project.quoted_hours > 0 else None
     discounted = sum(s.discounted_minutes for s in slices) / 60
-    chosen = [s for s in slices if engineer is None or s.entry.engineer == engineer]
+    imported = project.opening_amount is not None
+    # Hours valued at the rate: everything, except imported hours when an imported amount covers them.
+    at_rate = lambda group: [s for s in group if not (imported and s.entry.source == 'opening')]
+    dollars = lambda group: sum(s.discounted_minutes for s in at_rate(group)) / 60 * rate
+    shares = _imported_shares(project, slices)
+    wanted = engineer.casefold() if engineer else None
+    chosen = [s for s in slices if wanted is None or s.entry.engineer.casefold() == wanted]
     in_period = [s for s in chosen if period.contains(s.entry.date)]
+    by_engineer: dict = defaultdict(float)
+    for s in at_rate(in_period):
+        by_engineer[s.entry.engineer or 'Unassigned'] += s.discounted_minutes / 60 * rate
+    if not period.dated:
+        for name, share in shares.items():
+            if wanted is None or name.casefold() == wanted:
+                by_engineer[name] += share
     period_discounted = sum(s.discounted_minutes for s in in_period) / 60
     return ProjectRow(
-        project=project, logged_h=logged, quoted_h=quoted, discounted_h=discounted, amount=discounted * rate,
+        project=project, logged_h=logged, quoted_h=quoted, discounted_h=discounted,
+        amount=dollars(slices) + (project.opening_amount or 0.0),
         over_pct=round((logged - quoted) / quoted * 100, 1) if quoted else None,
         opening_h=sum(s.minutes for s in slices if not s.entry.date) / 60,
         period_logged_h=sum(s.minutes for s in in_period) / 60,
-        period_discounted_h=period_discounted, period_amount=period_discounted * rate,
-        slices=chosen, period_slices=in_period)
+        period_discounted_h=period_discounted, period_amount=sum(by_engineer.values()),
+        slices=chosen, period_slices=in_period, engineer_amounts=dict(by_engineer))
 
 
 @dataclass
@@ -141,6 +175,9 @@ class Summary:
     by_reason: dict = field(default_factory=dict)
     trend: list = field(default_factory=list)
     before_tracking_h: float = 0.0
+    amount_by_region: dict = field(default_factory=dict)
+    amount_by_engineer: dict = field(default_factory=dict)
+    amount_by_reason: dict = field(default_factory=dict)
 
 
 def _ranked(totals: dict) -> dict:
@@ -192,18 +229,24 @@ def summarise(projects, entries, rate: float, period: Period | None = None, regi
             grouped[e.project_id].append(e)
     summary = Summary(period=period, rate=rate)
     regions, engineers, reasons = defaultdict(float), defaultdict(float), defaultdict(float)
+    region_d, engineer_d, reason_d = defaultdict(float), defaultdict(float), defaultdict(float)
     period_slices, over = [], []
     for project in projects:
         if project.deleted or (region and project.region != region):
             continue
         row = project_totals(project, grouped.get(project.id, []), rate, period, engineer)
-        if (period.dated or engineer) and not row.period_slices:
+        if (period.dated or engineer) and not row.period_slices and row.period_amount <= 0:
             continue
         summary.rows.append(row)
         summary.discounted_h += row.period_discounted_h
         summary.logged_h += row.period_logged_h
         regions[project.region or 'No region'] += row.period_discounted_h
         reasons[project.reason_category or 'Other'] += row.period_discounted_h
+        region_d[project.region or 'No region'] += row.period_amount
+        reason_d[project.reason_category or 'Other'] += row.period_amount
+        for name, dollars in row.engineer_amounts.items():
+            engineer_d[name] += dollars
+        summary.amount += row.period_amount
         for s in row.period_slices:
             engineers[s.entry.engineer or 'Unassigned'] += s.discounted_minutes / 60
         summary.before_tracking_h += sum(s.discounted_minutes for s in row.slices if not s.entry.date) / 60
@@ -212,10 +255,12 @@ def summarise(projects, entries, rate: float, period: Period | None = None, regi
             summary.quoted_count += 1
             if row.logged_h > row.quoted_h:
                 over.append(row.over_pct)
-    summary.rows.sort(key=lambda r: (-r.period_discounted_h, -r.period_logged_h, r.project.name.casefold()))
-    summary.amount = summary.discounted_h * rate
+    summary.rows.sort(key=lambda r: (-r.period_amount, -r.period_discounted_h, -r.period_logged_h, r.project.name.casefold()))
     summary.over_count = len(over)
     summary.avg_over_pct = round(sum(over) / len(over), 1) if over else None
-    summary.by_region, summary.by_engineer, summary.by_reason = _ranked(regions), _ranked(engineers), _ranked(reasons)
+    summary.by_region, summary.by_engineer, summary.by_reason = (
+        _ranked(regions), _ranked(merge_names(engineers)), _ranked(reasons))
+    summary.amount_by_region, summary.amount_by_engineer, summary.amount_by_reason = (
+        _ranked(region_d), _ranked(merge_names(engineer_d)), _ranked(reason_d))
     summary.trend = _trend(period, period_slices)
     return summary

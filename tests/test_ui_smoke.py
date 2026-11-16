@@ -39,18 +39,16 @@ def build(tmp_path, seed=False, timer=None):
     return MainWindow(store, settings)
 
 
-def test_empty_window_and_manager_gate(app, tmp_path):
+def test_everyone_gets_every_page(app, tmp_path):
     win = build(tmp_path)
-    for key in ('dashboard', 'projects', 'reports'):
-        assert not win.nav[key].isEnabled()
-    assert win.nav['log'].isEnabled() and win.nav['settings'].isEnabled()
-    win.set_manager(True)
-    for key in ('dashboard', 'projects', 'reports'):
+    assert list(win.nav) == ['log', 'dashboard', 'reports', 'settings']          # no Projects tab, no manager gate
+    assert not hasattr(win, 'lock') and not hasattr(win, 'manager')
+    for key in win.nav:
         assert win.nav[key].isEnabled()
         win.show_page(key)
+        assert win.current_page == key
+    assert win.pages['settings'].shared_card.isVisibleTo(win.pages['settings'])
     win.grab()
-    win.set_manager(False)
-    assert win.current_page == 'log'
 
 
 def test_batch_save(app, tmp_path):
@@ -114,7 +112,6 @@ def test_timer_restored(app, tmp_path):
 def test_dashboard_matches_calculation(app, tmp_path):
     from det.ui.common import fmt_h, fmt_money
     win = build(tmp_path, seed=True)
-    win.set_manager(True)
     dash = win.pages['dashboard']
     dash.set_period('All time')
     s = calc.summarise(win.store.live_projects(), win.store.live_entries(), 220.0, calc.all_time())
@@ -124,6 +121,12 @@ def test_dashboard_matches_calculation(app, tmp_path):
     assert dash.table.rowCount() == 2
     dash.set_period('This month')
     assert dash.tiles['hours'].value.text() == '6.00 h'
+    big = Project(name='Amount only', region='VIC', opening_amount=20750.0)
+    win.store.save_project(big, new=True)
+    dash.set_period('All time')
+    assert dash.tiles['amount'].value.text() == '$22,730'
+    assert dash.top.rows[0][1] == 'Amount only' and '$20,750' in dash.top.rows[0][3]      # ranked by dollars
+    assert dash.by_region.rows[0][:2] == ('VIC', 'VIC')
     win.show_page('dashboard')
     win.grab()
 
@@ -142,7 +145,6 @@ def test_charts_paint(app):
 
 def test_reports_page(app, tmp_path):
     win = build(tmp_path, seed=True)
-    win.set_manager(True)
     page = win.pages['reports']
     page.set_kind('Month', date.today())
     report = page.current_report()
@@ -154,12 +156,14 @@ def test_import_dialog_commits(app, tmp_path):
     from det.importer import ImportRow
     from det.ui.dialogs import ImportDialog
     win = build(tmp_path)
-    rows = [ImportRow(3, name='Project 1', region='QLD', hours=3.0),
+    rows = [ImportRow(3, name='Project 1', region='QLD', hours=3.0, amount=660.0),
             ImportRow(4, name='Project 2', region='VIC', hours=None, hours_text='15 & counting', needs_review=True)]
     dialog = ImportDialog(win, rows)
     dialog.table.item(1, dialog.COL_HOURS).setText('15')
+    dialog.table.item(1, dialog.COL_AMOUNT).setText('$18,050')
     assert dialog.commit() == (2, 2)
     assert sorted(e.minutes for e in win.store.live_entries()) == [180, 900]
+    assert sorted(p.opening_amount for p in win.store.live_projects()) == [660, 18050]
     dialog = ImportDialog(win, [ImportRow(5, name='Project 3', hours=None, hours_text='soon', needs_review=True)])
     dialog.table.item(0, dialog.COL_HOURS).setText('abc')
     assert dialog.commit() is None and 'Row 5' in dialog.error.text()
@@ -168,20 +172,27 @@ def test_import_dialog_commits(app, tmp_path):
 def test_project_and_entry_dialogs(app, tmp_path):
     from det.ui.dialogs import EntryDialog, ProjectDetailDialog, ProjectDialog
     win = build(tmp_path, seed=True)
-    win.set_manager(True)
     dialog = ProjectDialog(win)
     dialog.name.setText('New job')
     dialog.quoted.setText('12.5')
     assert dialog.save()
     created = next(p for p in win.store.live_projects() if p.name == 'New job')
     assert created.quoted_hours == 12.5 and created.created_by == 'Sam'
+    edit = ProjectDialog(win, created)
+    edit.amount.setText('1,800')
+    assert edit.save() and win.store.projects[created.id].opening_amount == 1800
+    edit = ProjectDialog(win, win.store.projects[created.id])
+    edit.amount.setText('lots')
+    assert not edit.save() and 'amount' in edit.error.text().lower()
     dialog = ProjectDialog(win)
     assert not dialog.save() and dialog.error.text()
     entry_dialog = EntryDialog(win, project_id=created.id)
     entry_dialog.hours.setValue(1.5)
     assert entry_dialog.save()
     assert any(e.project_id == created.id and e.minutes == 90 for e in win.store.live_entries())
-    ProjectDetailDialog(win, created.id).grab()
+    detail = ProjectDetailDialog(win, created.id)
+    detail.grab()
+    assert detail.delete_button.isVisibleTo(detail) and detail.edit_button.isVisibleTo(detail)
 
 
 def test_dark_theme_and_sync_reload(app, tmp_path):
@@ -248,8 +259,7 @@ def test_floating_timer_is_docked_over_every_page(app, tmp_path):
     host = win.centralWidget()
     assert ft.parentWidget() is host and not ft.detached and ft.isVisible()
     assert host.rect().contains(ft.geometry())
-    win.set_manager(True)
-    for key in ('dashboard', 'projects', 'reports', 'settings'):
+    for key in ('dashboard', 'reports', 'settings'):
         win.show_page(key)
         app.processEvents()
         assert ft.isVisible()
@@ -365,4 +375,22 @@ def test_floating_timer_hide_and_show(app, tmp_path):
     assert not ft.shown and not ft.isVisible() and log.widget_button.text() == 'Show widget'
     log.widget_button.click()
     assert ft.shown and ft.isVisible() and log.widget_button.text() == 'Hide widget'
+    win.close()
+
+
+def test_dashboard_lists_are_not_clipped(app, tmp_path):
+    """Data arriving while another page is showing must not leave the dashboard lists cut short."""
+    win = build(tmp_path)
+    win.resize(1360, 1500)
+    win.show()
+    app.processEvents()
+    for i in range(9):
+        win.store.save_project(Project(name=f'Imported {i}', region='NSW', opening_amount=1000.0 + i), new=True)
+    win.refresh_pages()
+    win.show_page('dashboard')
+    app.processEvents()
+    top = win.pages['dashboard'].top
+    card_frame = top.parentWidget()
+    assert len(top.rows) == 8 and top.height() >= top.sizeHint().height()
+    assert card_frame.height() >= top.geometry().bottom()            # the card is tall enough to show every row
     win.close()

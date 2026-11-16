@@ -28,7 +28,8 @@ def build_report(store, period: calc.Period, rate: float | None = None, region: 
                  engineer: str | None = None) -> Report:
     rate = store.config.rate if rate is None else rate
     s = calc.summarise(store.live_projects(), store.live_entries(), rate, period, region, engineer)
-    split = lambda totals: [(label, hours, hours * rate) for label, hours in totals.items()]
+    # Ranked by dollars; hours shown beside them. A label can have dollars and no hours (imported amounts).
+    split = lambda hours, dollars: [(label, hours.get(label, 0.0), amount) for label, amount in dollars.items()]
     entries = []
     for row in s.rows:
         for piece in row.period_slices:
@@ -43,7 +44,8 @@ def build_report(store, period: calc.Period, rate: float | None = None, region: 
                   'avg_over_pct': s.avg_over_pct},
         project_rows=[(r.project.name, r.project.sf_id, r.project.region, r.quoted_h, r.period_logged_h,
                        r.period_discounted_h, r.period_amount, r.over_pct) for r in s.rows],
-        engineer_rows=split(s.by_engineer), region_rows=split(s.by_region), reason_rows=split(s.by_reason),
+        engineer_rows=split(s.by_engineer, s.amount_by_engineer), region_rows=split(s.by_region, s.amount_by_region),
+        reason_rows=split(s.by_reason, s.amount_by_reason),
         entry_rows=entries, before_tracking_h=s.before_tracking_h)
 
 

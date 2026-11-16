@@ -9,7 +9,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDateEdit, QDialog, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+                               QFileDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox,
                                QPlainTextEdit, QPushButton, QTableWidgetItem, QVBoxLayout)
 
 from .. import calc, importer
@@ -35,12 +35,11 @@ def _buttons(dialog, ok_text: str = 'Save'):
 
 
 class ProjectDialog(QDialog):
-    """Engineers fill name, SF ID and region; the manager also sets quote, approval and reason."""
+    """Every field of a project. Anyone can add or edit one."""
 
     def __init__(self, win, project: Project | None = None):
         super().__init__(win)
         self.win, self.original = win, project
-        self.full = win.manager
         self.setWindowTitle('Edit project' if project else 'New project')
         self.setMinimumWidth(460)
         config = win.store.config
@@ -57,6 +56,8 @@ class ProjectDialog(QDialog):
         form.addRow('Region', self.region)
         self.quoted = QLineEdit('' if p.quoted_hours is None else f'{p.quoted_hours:g}')
         self.quoted.setPlaceholderText('Leave blank if there is no quote')
+        self.amount = QLineEdit('' if p.opening_amount is None else f'{p.opening_amount:,.2f}')
+        self.amount.setPlaceholderText('Dollar figure carried over from the old sheet, if any')
         self.approved_by = QLineEdit(p.approved_by)
         self.lead = QLineEdit(p.lead_engineer)
         self.category = QComboBox()
@@ -71,19 +72,16 @@ class ProjectDialog(QDialog):
         self.status = QComboBox()
         self.status.addItems(['open', 'closed'])
         self.status.setCurrentText(p.status)
-        if self.full:
-            form.addRow('Quoted hours', self.quoted)
-            form.addRow('Approved by', self.approved_by)
-            form.addRow('Lead engineer', self.lead)
-            form.addRow('Discount reason', self.category)
-            form.addRow('Reason detail', self.detail)
-            form.addRow('Remarks', self.remarks)
-            form.addRow('Status', self.status)
+        form.addRow('Quoted hours', self.quoted)
+        form.addRow('Imported amount ($)', self.amount)
+        form.addRow('Approved by', self.approved_by)
+        form.addRow('Lead engineer', self.lead)
+        form.addRow('Discount reason', self.category)
+        form.addRow('Reason detail', self.detail)
+        form.addRow('Remarks', self.remarks)
+        form.addRow('Status', self.status)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
-        if not self.full:
-            hint = label('The manager adds the quote, approval and discount reason.', 'faint')
-            layout.addWidget(hint)
         row, ok = _buttons(self)
         ok.clicked.connect(self._accept)
         layout.addLayout(row)
@@ -102,23 +100,32 @@ class ProjectDialog(QDialog):
                           and p.sf_id.casefold() == project.sf_id.casefold()), None)
             if clash:
                 raise ValueError('A project with this name and SF ID already exists.')
-            if self.full:
-                text = self.quoted.text().strip()
-                if text:
-                    try:
-                        project.quoted_hours = float(text)
-                    except ValueError:
-                        raise ValueError('Quoted hours must be a number.') from None
-                    if not 0 <= project.quoted_hours < 1e6:
-                        raise ValueError('Quoted hours must be zero or more.')
-                else:
-                    project.quoted_hours = None
-                project.approved_by = self.approved_by.text().strip()
-                project.lead_engineer = self.lead.text().strip()
-                project.reason_category = self.category.currentText()
-                project.reason_detail = self.detail.text().strip()
-                project.remarks = self.remarks.toPlainText().strip()
-                project.status = self.status.currentText()
+            text = self.quoted.text().strip()
+            if text:
+                try:
+                    project.quoted_hours = float(text)
+                except ValueError:
+                    raise ValueError('Quoted hours must be a number.') from None
+                if not 0 <= project.quoted_hours < 1e6:
+                    raise ValueError('Quoted hours must be zero or more.')
+            else:
+                project.quoted_hours = None
+            project.approved_by = self.approved_by.text().strip()
+            project.lead_engineer = self.lead.text().strip()
+            project.reason_category = self.category.currentText()
+            project.reason_detail = self.detail.text().strip()
+            project.remarks = self.remarks.toPlainText().strip()
+            project.status = self.status.currentText()
+            money = self.amount.text().replace(',', '').replace('$', '').strip()
+            if money:
+                try:
+                    project.opening_amount = float(money)
+                except ValueError:
+                    raise ValueError('Imported amount must be a number.') from None
+                if not 0 <= project.opening_amount < 1e9:
+                    raise ValueError('Imported amount must be zero or more.')
+            else:
+                project.opening_amount = None
             self.win.store.save_project(project, new=self.original is None)
         except (ValueError, OSError) as problem:
             self.error.setText(str(problem))
@@ -164,8 +171,7 @@ class EntryDialog(QDialog):
         form.addRow('Hours', self.hours)
         form.addRow('Revision', self.revision)
         form.addRow('Note', self.note)
-        if win.manager:
-            form.addRow('Engineer', self.engineer)
+        form.addRow('Engineer', self.engineer)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         row, ok = _buttons(self)
@@ -179,7 +185,7 @@ class EntryDialog(QDialog):
         entry.minutes = round(self.hours.value() * 60)
         entry.revision = self.revision.text().strip()
         entry.note = self.note.text().strip()
-        entry.engineer = (self.engineer.text().strip() if self.win.manager else entry.engineer) or self.win.user
+        entry.engineer = self.engineer.text().strip() or self.win.user
         try:
             self.win.store.save_entry(entry, new=self.original is None)
         except (ValueError, OSError) as problem:
@@ -190,6 +196,10 @@ class EntryDialog(QDialog):
     def _accept(self) -> None:
         if self.save():
             self.accept()
+
+
+def button_at(row, index):
+    return row.itemAt(index).widget()
 
 
 class ProjectDetailDialog(QDialog):
@@ -211,11 +221,12 @@ class ProjectDetailDialog(QDialog):
             layout.addWidget(widget)
         row = QHBoxLayout()
         for text, slot in (('Add entry', self.add_entry), ('Edit entry', self.edit_entry),
-                           ('Delete entry', self.delete_entry), ('Edit project', self.edit_project)):
+                           ('Delete entry', self.delete_entry), ('Edit project', self.edit_project),
+                           ('Delete project', self.delete_project)):
             button = QPushButton(text)
             button.clicked.connect(slot)
-            button.setVisible(win.manager)
             row.addWidget(button)
+        self.edit_button, self.delete_button = button_at(row, 3), button_at(row, 4)
         row.addStretch(1)
         close = QPushButton('Close')
         close.clicked.connect(self.accept)
@@ -239,8 +250,10 @@ class ProjectDetailDialog(QDialog):
                  project.remarks, 'Closed' if project.status == 'closed' else '']
         self.meta.setText('  ·  '.join(part for part in parts if part))
         quote = fmt_h(row.quoted_h) if row.quoted_h else 'no quote'
+        imported = '' if project.opening_amount is None else f'   ·   Imported amount {fmt_money(project.opening_amount)}'
         self.figures.setText(f'Quoted {quote}   ·   Logged {fmt_h(row.logged_h)}   ·   Discounted '
-                             f'{fmt_h(row.discounted_h)} ({fmt_money(row.amount)})   ·   Over quote {fmt_pct(row.over_pct)}')
+                             f'{fmt_h(row.discounted_h)}   ·   Total {fmt_money(row.amount)}{imported}'
+                             f'   ·   Over quote {fmt_pct(row.over_pct)}')
         rows = [[(fmt_date(s.entry.date), s.entry.date or ''), s.entry.engineer, s.entry.revision, s.entry.note,
                  (f'{s.entry.hours:,.2f}', s.entry.hours), (f'{s.discounted_h:,.2f}', s.discounted_h),
                  {'opening': 'Opening balance', 'timer': 'Timer', 'batch': 'Batch'}.get(s.entry.source, s.entry.source)]
@@ -257,7 +270,7 @@ class ProjectDetailDialog(QDialog):
 
     def edit_entry(self) -> None:
         entry = self.win.store.entries.get(selected_id(self.table) or '')
-        if entry and self.win.manager and EntryDialog(self.win, entry).exec():
+        if entry and EntryDialog(self.win, entry).exec():
             self._changed()
 
     def delete_entry(self) -> None:
@@ -270,25 +283,46 @@ class ProjectDetailDialog(QDialog):
         if ProjectDialog(self.win, self.win.store.projects[self.project_id]).exec():
             self._changed()
 
+    def delete_project(self) -> None:
+        store = self.win.store
+        project = store.projects[self.project_id]
+        count = sum(1 for e in store.live_entries() if e.project_id == project.id)
+        message = f'Delete "{project.name}"?'
+        if count:
+            message += f'\n\nIts {count} time entr{"y" if count == 1 else "ies"} will no longer count in any total.'
+        if QMessageBox.question(self, 'Delete project', message) != QMessageBox.Yes:
+            return
+        try:
+            store.delete_project(project.id)
+        except OSError as problem:
+            QMessageBox.warning(self, 'Not deleted', f'The project could not be deleted.\n\n{problem}')
+            return
+        self.win.refresh_pages()
+        self.accept()
+
 
 class ImportDialog(QDialog):
-    """Review before import. Hours that were not plain numbers are highlighted for the manager to type."""
-    COL_ROW, COL_NAME, COL_REGION, COL_HOURS, COL_ORIGINAL, COL_REASON, COL_CHECK = range(7)
+    """Review before import. Hours that were not plain numbers are marked to be typed in."""
+    (COL_ROW, COL_NAME, COL_REGION, COL_HOURS, COL_AMOUNT, COL_ORIGINAL, COL_CATEGORY, COL_REASON,
+     COL_CHECK) = range(9)
 
     def __init__(self, win, rows):
         super().__init__(win)
         self.win, self.rows = win, rows
         self.setWindowTitle('Import from Excel')
-        self.setMinimumSize(900, 540)
+        self.setMinimumSize(1180, 600)
         layout = QVBoxLayout(self)
         flagged = sum(1 for r in rows if r.needs_review)
         intro = label(f'{len(rows)} rows found. Each becomes a project with an undated opening balance. '
                       f'{flagged} row(s) marked "Type the hours" had hours that were not a plain number: type the figure, '
-                      f'or leave it blank to import the project with no hours. Name and hours can be edited here.', 'muted')
+                      f'or leave it blank to import the project with no hours. Name, hours and amount can be edited here. '
+                      f'The amount is the sheet\'s Discounted Amount and is kept as given.', 'muted')
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        self.table = make_table(['Row', 'Project name', 'Region', 'Hours', 'Original hours cell', 'Reason', 'Check'],
-                                stretch=self.COL_REASON)
+        self.table = make_table(['Row', 'Project name', 'Region', 'Hours', 'Amount $', 'Original hours cell', 'Category',
+                                 'Reason', 'Check'], stretch=self.COL_REASON)
+        self.table.horizontalHeader().setSectionResizeMode(self.COL_NAME, QHeaderView.Interactive)
+        self.table.setColumnWidth(self.COL_NAME, 300)
         self.table.setSortingEnabled(False)
         self.table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked
                                    | QAbstractItemView.EditKeyPressed | QAbstractItemView.AnyKeyPressed)
@@ -297,10 +331,11 @@ class ImportDialog(QDialog):
         flag = QColor(tokens()['accent2'])
         for r, row in enumerate(rows):
             cells = [str(row.row_no), row.name, row.region, '' if row.hours is None else f'{row.hours:g}',
-                     row.hours_text, row.reason, 'Type the hours' if row.needs_review else '']
+                     '' if row.amount is None else f'{row.amount:,.2f}', row.hours_text, row.category, row.reason,
+                     'Type the hours' if row.needs_review else '']
             for c, text in enumerate(cells):
                 item = QTableWidgetItem(text)
-                if c not in (self.COL_NAME, self.COL_HOURS):
+                if c not in (self.COL_NAME, self.COL_HOURS, self.COL_AMOUNT):
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 if row.needs_review:
                     item.setForeground(flag)        # rows to check are tinted and marked in the last column
@@ -325,7 +360,15 @@ class ImportDialog(QDialog):
             except ValueError:
                 self.error.setText(f'Row {row.row_no}: hours must be a number, or blank.')
                 return None
-            row.name, row.hours = name, hours
+            money = self.table.item(r, self.COL_AMOUNT).text().replace(',', '').replace('$', '').strip()
+            try:
+                amount = float(money) if money else None
+                if amount is not None and not 0 <= amount < 1e9:
+                    raise ValueError
+            except ValueError:
+                self.error.setText(f'Row {row.row_no}: amount must be a number, or blank.')
+                return None
+            row.name, row.hours, row.amount = name, hours, amount
         try:
             return importer.commit(self.rows, self.win.store, self.win.user)
         except (ValueError, OSError) as problem:
@@ -350,7 +393,7 @@ class FirstRunDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(label('Set up', 'title'))
         intro = label('Choose the shared team folder in Dropbox. Everyone must pick the same folder so the '
-                      'manager sees all hours. An empty folder is fine; the app creates what it needs.', 'muted')
+                      'dashboard shows all hours. An empty folder is fine; the app creates what it needs.', 'muted')
         intro.setWordWrap(True)
         layout.addWidget(intro)
         form = QFormLayout()

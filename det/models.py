@@ -36,6 +36,9 @@ class Project(Record):
     approved_by: str = ''
     lead_engineer: str = ''
     quoted_hours: float | None = None
+    # Dollar figure carried over from the old sheet. It stands in for the dollar value of this project's
+    # imported (opening) hours, because the sheet's amounts were not always hours x rate.
+    opening_amount: float | None = None
     reason_category: str = 'Other'
     reason_detail: str = ''
     remarks: str = ''
@@ -74,4 +77,16 @@ class Config(Record):
     regions: list = field(default_factory=lambda: ['QLD', 'NSW', 'VIC', 'NZ'])
     reason_categories: list = field(default_factory=lambda: [
         'Good client', 'Change of scope', 'Revised drawings', 'Project size', 'Other'])
-    passcode_hash: str = ''
+
+
+def merge_names(totals: dict) -> dict:
+    """Add up values for names that differ only by letter case ('NATHAN', 'NAthan'), so one person is
+    not shown as two. A name with a single spelling is kept exactly as typed."""
+    groups: dict = {}
+    for name, value in totals.items():
+        groups.setdefault(name.casefold(), {})[name] = value
+    merged = {}
+    for key, variants in groups.items():
+        label = next(iter(variants)) if len(variants) == 1 else key.title()
+        merged[label] = sum(variants.values())
+    return merged
