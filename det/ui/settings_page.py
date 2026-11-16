@@ -1,13 +1,12 @@
-"""Settings: personal (name, folder, theme) and shared (rate, lists, Excel import). Open to everyone."""
+"""Settings: personal (name, theme, start with Windows, data folder) and shared (rate, lists, Excel import)."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import (QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QHBoxLayout,
-                               QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout,
+                               QHBoxLayout, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
-from .. import importer
-from ..store import Store
+from .. import autostart, importer
 from ..theme import apply_theme
 from .common import Hero, card, label
 from .dialogs import ImportDialog
@@ -21,9 +20,9 @@ class SettingsPage(QWidget):
         super().__init__()
         self.win = win
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 14, 32, 28)
+        layout.setContentsMargins(32, 22, 32, 12)
         layout.setSpacing(18)
-        self.hero = Hero('Settings', '', 'Personal settings stay on this computer. Shared settings apply to everyone.')
+        self.hero = Hero('Settings', '', 'Nothing here is needed to start. Personal settings stay on this computer; shared settings apply to everyone.')
         layout.addWidget(self.hero)
 
         frame, box = card('This computer')
@@ -32,17 +31,23 @@ class SettingsPage(QWidget):
         self.folder = label('', 'muted')
         self.folder.setWordWrap(True)
         change = QPushButton('Change…')
-        change.clicked.connect(self.change_folder)
+        change.clicked.connect(win.choose_folder)
         row = QHBoxLayout()
         row.addWidget(self.folder, 1)
         row.addWidget(change)
         self.theme = QComboBox()
         self.theme.addItems(['dark', 'light'])
+        self.autostart = QCheckBox('Start the timer widget when I sign in to Windows')
+        self.autostart.setEnabled(autostart.supported())
+        self.autostart.setChecked(autostart.is_enabled())
+        self.autostart.toggled.connect(autostart.set_enabled)
         form.addRow('Your name', self.name)
-        form.addRow('Shared folder', row)
         form.addRow('Theme', self.theme)
+        form.addRow('', self.autostart)
+        form.addRow('Data folder', row)
         box.addLayout(form)
-        hint = label('Your name is stored on each entry you log. Changing it does not rename past entries.', 'faint')
+        hint = label('Your name comes from Windows and is stored on each entry you log. Changing it does not rename '
+                     'past entries. The data folder is found by itself; change it only if it is wrong.', 'faint')
         box.addWidget(hint)
         save = QPushButton('Save')
         save.setObjectName('primary')
@@ -88,8 +93,9 @@ class SettingsPage(QWidget):
         self.hero.restyle()
         settings, config = self.win.settings, self.win.store.config
         if not self.name.hasFocus():
-            self.name.setText(settings.get('user_name') or '')
-        self.folder.setText(str(self.win.store.directory))
+            self.name.setText(self.win.user)
+        where = 'team folder, found automatically or chosen here' if self.win.location.shared else 'this PC only'
+        self.folder.setText(f'{self.win.store.directory}   ({where})')
         self.theme.setCurrentText(settings.get('theme') or 'dark')
         if not any(w.hasFocus() for w in (self.rate, self.regions, self.reasons)):
             self.rate.setValue(config.rate)
@@ -106,14 +112,6 @@ class SettingsPage(QWidget):
         self.win.settings.save()
         apply_theme(QApplication.instance(), self.theme.currentText())
         self.win.refresh_pages()
-
-    def change_folder(self) -> None:
-        chosen = QFileDialog.getExistingDirectory(self, 'Shared team folder', str(self.win.store.directory))
-        if chosen and Path(chosen).is_dir():
-            store = Store(chosen)
-            store.load()
-            self.win.settings.set('shared_dir', chosen)
-            self.win.set_store(store)
 
     def save_shared(self) -> None:
         config = self.win.store.config

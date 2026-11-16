@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import copy
-import getpass
 from datetime import date
-from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -380,54 +378,3 @@ class ImportDialog(QDialog):
         if result:
             self.created = result
             self.accept()
-
-
-class FirstRunDialog(QDialog):
-    """Asks once for the user's name and the shared team folder."""
-
-    def __init__(self, settings):
-        super().__init__()
-        self.settings = settings
-        self.setWindowTitle('Discounted Engineering Tracker')
-        self.setMinimumWidth(520)
-        layout = QVBoxLayout(self)
-        layout.addWidget(label('Set up', 'title'))
-        intro = label('Choose the shared team folder in Dropbox. Everyone must pick the same folder so the '
-                      'dashboard shows all hours. An empty folder is fine; the app creates what it needs.', 'muted')
-        intro.setWordWrap(True)
-        layout.addWidget(intro)
-        form = QFormLayout()
-        try:
-            guess = getpass.getuser()
-        except Exception:
-            guess = ''
-        self.name = QLineEdit(settings.get('user_name') or guess)
-        self.folder = QLineEdit(settings.get('shared_dir') or '')
-        browse = QPushButton('Browse…')
-        browse.clicked.connect(self._browse)
-        row = QHBoxLayout()
-        row.addWidget(self.folder, 1)
-        row.addWidget(browse)
-        form.addRow('Your name', self.name)
-        form.addRow('Shared folder', row)
-        layout.addLayout(form)
-        buttons, ok = _buttons(self, 'Continue')
-        ok.clicked.connect(self._accept)
-        layout.addLayout(buttons)
-
-    def _browse(self) -> None:
-        chosen = QFileDialog.getExistingDirectory(self, 'Shared team folder', self.folder.text())
-        if chosen:
-            self.folder.setText(chosen)
-
-    def _accept(self) -> None:
-        name, folder = self.name.text().strip(), self.folder.text().strip()
-        if not name:
-            self.error.setText('Enter your name.')
-            return
-        if not folder or not Path(folder).is_dir():
-            self.error.setText('Choose a folder that exists.')
-            return
-        self.settings.data.update(user_name=name, shared_dir=folder)
-        self.settings.save()
-        self.accept()

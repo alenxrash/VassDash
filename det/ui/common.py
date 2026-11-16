@@ -225,6 +225,7 @@ class ProjectCombo(QComboBox):
         completer.setCompletionMode(QCompleter.PopupCompletion)
         completer.setFilterMode(Qt.MatchContains)
         completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.activated.connect(self._show_start)
         if store is not None:
             self.reload(store)
 
@@ -244,6 +245,12 @@ class ProjectCombo(QComboBox):
         else:
             self.setEditText(typed if not current else '')
         self.blockSignals(False)
+        self._show_start()
+
+    def _show_start(self, *_) -> None:
+        """Long names are shown from their beginning, not their end, unless the person is typing."""
+        if not self.lineEdit().hasFocus() or self.project_id():
+            self.lineEdit().setCursorPosition(0)
 
     def project_id(self):
         index = self.findText(self.currentText().strip(), Qt.MatchFixedString)
@@ -254,3 +261,4 @@ class ProjectCombo(QComboBox):
         self.setCurrentIndex(index)
         if index < 0:
             self.setEditText('')
+        self._show_start()

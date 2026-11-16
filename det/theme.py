@@ -1,6 +1,6 @@
 """App theme: every colour and the stylesheet live here. Call apply_theme(app, mode) at startup.
 
-Revision 2 look: deep navy canvas, rounded glass-style cards, pill controls and a blue accent.
+VassDash look: deep navy canvas, rounded cards, pill controls and a blue accent, with a top tab bar.
 'dark' is the default; 'light' keeps the same shapes on a pale background.
 """
 from __future__ import annotations
@@ -39,25 +39,24 @@ QWidget { font-size: 13px; color: $text; }
 QMainWindow, QDialog { background: $canvas; }
 QWidget#root { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 $canvas, stop:1 $canvas2); }
 QToolTip { background: $surface_alt; color: $text; border: 1px solid $border_strong; padding: 6px 8px; }
-QFrame#sidebar { background: $sidebar; border: none; border-right: 1px solid $border; }
+QFrame#topbar { background: $sidebar; border: none; border-bottom: 1px solid $border; }
+QFrame#noteBox { background: $accent_soft; border: 1px solid $border_strong; border-radius: 14px; }
 QFrame#card { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 $surface, stop:1 $surface_low);
               border: 1px solid $border; border-radius: 22px; }
 QFrame#heroCard { background: qlineargradient(x1:0, y1:0, x2:0.25, y2:1, stop:0 $surface, stop:0.5 $accent_soft, stop:1 $glow);
                   border: 1px solid $border_strong; border-radius: 22px; }
-QFrame#floatTimer { background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1, stop:0 $surface_alt, stop:0.6 $accent_soft, stop:1 $glow);
-                    border: 1px solid $accent; border-radius: 18px; }
-QFrame#floatTimer[detached="true"] { border-radius: 0px; }
+QFrame#timerWidget { background: qlineargradient(x1:0, y1:0, x2:0.3, y2:1, stop:0 $surface_alt, stop:0.6 $accent_soft, stop:1 $glow);
+                     border: 1px solid $accent; border-radius: 0px; }
 QPushButton#mini { border: none; background: transparent; color: $text_muted; padding: 0px 5px; min-height: 0px;
                    font-size: 12px; }
 QPushButton#mini:hover { color: $text; }
 QLabel { background: transparent; }
-QLabel#appTitle { font-size: 16px; font-weight: 700; }
+QLabel#appTitle { font-size: 17px; font-weight: 700; }
 QLabel#hero { font-size: 30px; font-weight: 600; }
 QLabel#title { font-size: 21px; font-weight: 600; }
 QLabel#cardTitle { font-size: 14px; font-weight: 600; color: $text; }
 QLabel#muted { color: $text_muted; }
 QLabel#faint { color: $text_faint; font-size: 12px; }
-QLabel#crumbs { color: $text_muted; }
 QLabel#tileValue { font-size: 28px; font-weight: 600; }
 QLabel#timerValue { font-size: 44px; font-weight: 600; }
 QLabel#error { color: $danger; }
@@ -79,11 +78,10 @@ QPushButton#primary:hover { background: $accent_hover; }
 QPushButton#primary:disabled { background: $border_strong; border-color: $border_strong; color: $text_faint; }
 QPushButton#round { border-radius: 17px; padding: 0px; min-width: 34px; max-width: 34px; min-height: 34px;
                     max-height: 34px; font-size: 16px; }
-QPushButton#nav { text-align: left; border: none; background: transparent; padding: 5px 6px; color: $text_muted;
-                  border-radius: 22px; }
-QPushButton#nav:hover { color: $text; }
-QPushButton#nav:checked { color: $text; font-weight: 600; }
-QPushButton#nav:disabled { color: $text_faint; }
+QPushButton#tab { border: none; background: transparent; color: $text_muted; padding: 8px 16px; border-radius: 17px; }
+QPushButton#tab:hover { color: $text; background: $surface_alt; }
+QPushButton#tab:checked { color: $accent_text; font-weight: 600;
+                          background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 $accent, stop:1 $accent_hover); }
 QPushButton#link { border: none; background: transparent; color: $accent2; padding: 2px 4px; }
 
 QLineEdit, QComboBox, QDateEdit, QDoubleSpinBox, QSpinBox, QPlainTextEdit {

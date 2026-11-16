@@ -4,13 +4,13 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QDateEdit, QHBoxLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QDateEdit, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
 from .. import calc
 from .charts import BarList, StatTile, TrendChart
 from .common import (PERIODS, Hero, card, fit_rows, fmt_h, fmt_money, fmt_pct, from_qdate, label, make_table, page_scroll,
                      period_for, set_rows, to_qdate)
-from .dialogs import ProjectDetailDialog
+from .dialogs import ProjectDetailDialog, ProjectDialog
 
 TOP = 8
 
@@ -24,7 +24,7 @@ class DashboardPage(QWidget):
         scroll, body = page_scroll()
         outer.addWidget(scroll)
         layout = QVBoxLayout(body)
-        layout.setContentsMargins(32, 14, 32, 28)
+        layout.setContentsMargins(32, 22, 32, 28)
         layout.setSpacing(18)
 
         head = QHBoxLayout()
@@ -96,8 +96,12 @@ class DashboardPage(QWidget):
         layout.addLayout(columns)
 
         frame, box = card('Projects')
-        box.addWidget(label('Double-click a project to see its entries, edit it or delete it. New projects are added '
-                            'from Log time.', 'faint'))
+        row = QHBoxLayout()
+        row.addWidget(label('Double-click a project to see its entries, edit it or delete it.', 'faint'), 1)
+        new_project = QPushButton('New project')
+        new_project.clicked.connect(self.new_project)
+        row.addWidget(new_project)
+        box.addLayout(row)
         self.table = make_table(['Project', 'Region', 'Quoted h', 'Logged h (total)', 'Discounted h (period)',
                                  'Discounted $ (period)', 'Over quote'])
         self.table.doubleClicked.connect(lambda index: self.open_project(self.table.item(index.row(), 0).data(Qt.UserRole)))
@@ -164,6 +168,10 @@ class DashboardPage(QWidget):
                  (fmt_pct(r.over_pct), r.over_pct if r.over_pct is not None else -1e9)] for r in s.rows]
         set_rows(self.table, rows, [r.project.id for r in s.rows])
         fit_rows(self.table, 3, 60)
+
+    def new_project(self) -> None:
+        if ProjectDialog(self.win).exec():
+            self.win.refresh_pages()
 
     def open_project(self, project_id) -> None:
         if project_id in self.win.store.projects:

@@ -51,7 +51,7 @@ class ReportsPage(QWidget):
         super().__init__()
         self.win = win
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 14, 32, 28)
+        layout.setContentsMargins(32, 22, 32, 28)
         layout.setSpacing(16)
         head = QHBoxLayout()
         head.setSpacing(10)

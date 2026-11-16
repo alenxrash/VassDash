@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 APP_DIR = 'DiscountedEngineeringTracker'
-DEFAULTS = {'shared_dir': '', 'user_name': '', 'theme': 'dark', 'timer': None, 'geometry': ''}
+DEFAULTS = {'shared_dir': '', 'data_mode': '', 'user_name': '', 'theme': 'dark', 'timer': None, 'geometry': ''}
 
 
 def default_path() -> Path:
