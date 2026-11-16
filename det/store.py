@@ -110,6 +110,8 @@ class Store:
     def _read_folder(folder: Path, kind, warnings: list[str]) -> dict:
         records = {}
         for path in sorted(folder.glob('*.json')):
+            if path.name.lower() == 'config.json':
+                continue                       # left by a data set started in the wrong folder; not a record
             if 'conflicted copy' in path.name.lower():
                 warnings.append(f'Sync conflict: {folder.name}/{path.name}')
                 continue

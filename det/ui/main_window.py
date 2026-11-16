@@ -171,10 +171,11 @@ class MainWindow(QMainWindow):
     def choose_folder(self) -> None:
         chosen = QFileDialog.getExistingDirectory(self, 'Team data folder', str(self.store.directory))
         if chosen and Path(chosen).is_dir():
-            self.use_folder(chosen)
+            self.use_folder(locate.data_root(chosen))
 
     def use_folder(self, chosen) -> None:
         """Switch to a folder picked by hand, taking along anything saved on this PC."""
+        chosen = locate.data_root(chosen)
         merged = 0
         if not self.location.shared and Path(chosen) != Path(self.store.directory):
             merged = locate.merge(self.store.directory, chosen)

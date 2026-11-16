@@ -113,3 +113,42 @@ def test_autostart_command():
         '"/usr/bin/python3" "/src/app.py" --widget'
     if not autostart.supported():
         assert autostart.is_enabled() is False and autostart.set_enabled(True) is False
+
+
+def _data_set(root):
+    """A data folder like the team's: one project, one entry, a config.json."""
+    from det.models import Entry, Project
+    s = Store(root)
+    s.load()
+    p = Project(name='Alpha')
+    s.save_project(p, new=True)
+    s.save_entry(Entry(project_id=p.id, engineer='Sam', date='2026-11-12', minutes=90), new=True)
+    s.save_config()
+    return p
+
+
+def test_picking_the_projects_subfolder_means_its_parent(tmp_path):
+    root = tmp_path / 'Data'
+    _data_set(root)
+    assert locate.data_root(root / 'Projects') == root
+    assert locate.data_root(root / 'Entries') == root
+    assert locate.data_root(root) == root
+    lone = tmp_path / 'Projects'                      # a folder named Projects with no data set around it
+    lone.mkdir()
+    assert locate.data_root(lone) == lone
+
+
+def test_saved_projects_subfolder_is_corrected_and_its_stray_files_ignored(tmp_path):
+    """The reported fault: settings pointed at <data>/Projects, which had grown its own empty data set."""
+    root = tmp_path / 'Data'
+    _data_set(root)
+    stray = Store(root / 'Projects')                  # what the old build created inside Projects
+    stray.load()
+    stray.save_config()
+    settings = Settings(tmp_path / 'settings.json')
+    settings.data.update(shared_dir=str(root / 'Projects'), data_mode='shared')
+    location = locate.resolve(settings, env={})
+    assert location.path == root and settings.get('shared_dir') == str(root)
+    store = Store(location.path)
+    store.load()
+    assert len(store.projects) == 1 and len(store.entries) == 1 and store.warnings == []

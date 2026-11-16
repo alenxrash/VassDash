@@ -78,6 +78,23 @@ def find_shared(roots, name: str = DATA_FOLDER, max_depth: int = MAX_DEPTH) -> P
     return None
 
 
+RECORD_FOLDERS = ('projects', 'entries')
+
+
+def data_root(path) -> Path:
+    """The data folder for a picked or saved path.
+
+    Picking the "Projects" or "Entries" folder inside a data folder is an easy slip; it used to start a new,
+    empty data set inside that subfolder. When the parent holds both record folders, the parent is meant.
+    """
+    path = Path(path)
+    parent = path.parent
+    if (path.name.casefold() in RECORD_FOLDERS and parent != path
+            and (parent / 'Projects').is_dir() and (parent / 'Entries').is_dir()):
+        return parent
+    return path
+
+
 def local_dir(env=None) -> Path:
     env = os.environ if env is None else env
     base = env.get('LOCALAPPDATA')
@@ -125,7 +142,11 @@ def resolve(settings, env=None) -> Location:
     """Decide where data lives, with no questions asked, and remember it."""
     saved, mode = settings.get('shared_dir'), settings.get('data_mode')
     if saved and mode != 'local' and Path(saved).is_dir():
-        return Location(Path(saved), True)
+        root = data_root(saved)
+        if root != Path(saved):
+            settings.data.update(shared_dir=str(root))
+            settings.save()
+        return Location(root, True)
     local = local_dir(env)
     found = find_shared(dropbox_roots(env))
     if found:
