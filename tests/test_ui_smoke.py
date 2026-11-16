@@ -428,3 +428,29 @@ def test_windows_sign_out_is_not_blocked(app, make):
     win.show()
     win._session_ending()                                 # Windows is signing out or shutting down
     assert win.close() and win._quitting                  # the close is accepted this time
+
+
+def test_dashboard_table_shows_engineer_and_columns_can_be_hidden(app, make):
+    win = make(seed=True)
+    tower = next(p for p in win.store.live_projects() if p.name == 'Tower A')
+    tower.lead_engineer, tower.sf_id = 'Cody', '24-0001-1'
+    win.store.save_project(tower)
+    win.refresh_pages()
+    dash = win.pages['dashboard']
+    headers = [dash.table.horizontalHeaderItem(c).text() for c in range(dash.table.columnCount())]
+    assert headers[:3] == ['Project', 'Engineer', 'Region']
+    cell = lambda name, header: next(dash.table.item(r, headers.index(header)).text() for r in range(dash.table.rowCount())
+                                     if dash.table.item(r, 0).text() == name)
+    assert cell('Tower A', 'Engineer') == 'Cody'
+    assert cell('Mezzanine', 'Engineer') == 'Sam'             # no lead engineer set: whoever logged the time
+    shown = lambda header: not dash.table.isColumnHidden(headers.index(header))
+    assert shown('Engineer') and shown('Region') and not shown('SF ID')      # extra columns start hidden
+    dash.column_actions['region'].trigger()                   # untick Region in the Columns menu
+    dash.column_actions['sf_id'].trigger()                    # tick SF ID
+    assert not shown('Region') and shown('SF ID') and cell('Tower A', 'SF ID') == '24-0001-1'
+    assert 'project' not in dash.column_actions               # the project name cannot be hidden
+    win.refresh_pages()
+    assert not shown('Region')                                # a refresh does not undo the choice
+    again = make(seed=True)                                   # and it is remembered next time
+    table = again.pages['dashboard'].table
+    assert table.isColumnHidden(headers.index('Region')) and not table.isColumnHidden(headers.index('SF ID'))

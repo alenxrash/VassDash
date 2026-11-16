@@ -68,6 +68,8 @@ To run from source: `pip install -r requirements.txt`, then `run_app.bat` (or `p
 - **Dashboard:** discounted hours and dollars, projects over quote, top projects, trend, and splits by
   region, engineer and reason. Double-click a project for its entries, to edit it or delete it. New
   project (with all fields) is here too.
+  The projects table shows the engineer, and its Columns button (or a right-click on a column heading)
+  hides or shows columns, including SF ID, Approved by, Reason and Status. The choice is remembered per PC.
 - **Reports:** week, month, financial year, custom range or all time; preview; export to PDF or Excel.
 - **Settings:** name, theme, start with Windows, data folder; rate, financial-year start, regions and
   reason categories; Import from Excel.
@@ -103,7 +105,7 @@ To run from source: `pip install -r requirements.txt`, then `run_app.bat` (or `p
 
 ## Tested and not tested
 
-Tested (75 automated tests, run on Linux with Python 3.13 and PySide6 6.12): storage, calculations, the
+Tested (76 automated tests, run on Linux with Python 3.13 and PySide6 6.12): storage, calculations, the
 automatic folder search and the move from local to team data (against a simulated Dropbox), the timer,
 the widget as a separate window that survives closing the main window, Excel import, PDF and Excel
 export, and smoke tests of every screen. The app was also launched end to end headless, including
