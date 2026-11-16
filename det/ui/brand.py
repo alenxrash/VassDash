@@ -1,15 +1,15 @@
-"""VassDash's own mark, painted in code: used for the window, the taskbar and the tray icon."""
+"""Budget Tracker's own mark, painted in code: used for the window, the taskbar and the tray icon."""
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPen, QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QIcon, QLinearGradient, QPainter, QPixmap
 
-NAME = 'VassDash'
+NAME = 'Budget Tracker'
 TAGLINE = 'Discounted engineering'
 
 
 def mark(size: int = 64) -> QPixmap:
-    """A rounded blue tile with a white tick-shaped V and a dial dot."""
+    """A rounded blue tile with three rising white bars (a budget being drawn down)."""
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.transparent)
     p = QPainter(pixmap)
@@ -21,14 +21,9 @@ def mark(size: int = 64) -> QPixmap:
     p.setPen(Qt.NoPen)
     p.setBrush(gradient)
     p.drawRoundedRect(QRectF(2, 2, 60, 60), 16, 16)
-    pen = QPen(QColor('#FFFFFF'), 7)
-    pen.setCapStyle(Qt.RoundCap)
-    pen.setJoinStyle(Qt.RoundJoin)
-    p.setPen(pen)
-    p.drawPolyline([QPointF(17, 22), QPointF(30, 44), QPointF(47, 18)])
-    p.setPen(Qt.NoPen)
     p.setBrush(QColor('#FFFFFF'))
-    p.drawEllipse(QPointF(47, 44), 4, 4)
+    for x, top in ((15, 34), (28, 25), (41, 16)):
+        p.drawRoundedRect(QRectF(x, top, 9, 48 - top), 3.5, 3.5)
     p.end()
     return pixmap
 

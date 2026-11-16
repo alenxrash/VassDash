@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
-VALUE = 'VassDash'
+VALUE = 'Budget Tracker'
+LEGACY_VALUES = ('VassDash',)          # names used by earlier builds
 
 
 def supported() -> bool:
@@ -31,8 +32,13 @@ def is_enabled() -> bool:
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
-            winreg.QueryValueEx(key, VALUE)
-        return True
+            for name in (VALUE,) + LEGACY_VALUES:
+                try:
+                    winreg.QueryValueEx(key, name)
+                    return True
+                except OSError:
+                    pass
+        return False
     except OSError:
         return False
 
@@ -44,6 +50,11 @@ def set_enabled(on: bool) -> bool:
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
+            for name in LEGACY_VALUES:
+                try:
+                    winreg.DeleteValue(key, name)
+                except FileNotFoundError:
+                    pass
             if on:
                 winreg.SetValueEx(key, VALUE, 0, winreg.REG_SZ, launch_command())
             else:
@@ -54,3 +65,23 @@ def set_enabled(on: bool) -> bool:
         return True
     except OSError:
         return False
+
+
+def migrate_legacy() -> None:
+    """An earlier build registered Start with Windows under an old name and exe path: re-point it here."""
+    if not supported():
+        return
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            found = False
+            for name in LEGACY_VALUES:
+                try:
+                    winreg.QueryValueEx(key, name)
+                    found = True
+                except OSError:
+                    pass
+    except OSError:
+        return
+    if found:
+        set_enabled(True)

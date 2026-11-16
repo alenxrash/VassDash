@@ -20,6 +20,7 @@ from PySide6.QtGui import QAction, QFont, QFontMetrics, QGuiApplication
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QInputDialog, QLabel, QMenu, QPushButton, QSizePolicy,
                                QVBoxLayout, QWidget)
 
+from . import brand
 from .common import ProjectCombo
 
 EDGE = 8                       # width of the resize border, in pixels
@@ -42,7 +43,7 @@ class TimerWidget(QFrame):
         super().__init__(None)
         self.win, self.controller = win, controller
         self.setObjectName('timerWidget')
-        self.setWindowTitle('VassDash timer')
+        self.setWindowTitle(f'{brand.NAME} timer')
         self.setMouseTracking(True)
         self.setMinimumSize(MIN_W, MIN_H)
         self.shown = True
@@ -60,10 +61,10 @@ class TimerWidget(QFrame):
         self.title.setObjectName('muted')
         self.title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.open_button = QPushButton('Open')
-        self.open_button.setToolTip('Open the VassDash window')
+        self.open_button.setToolTip(f'Open the {brand.NAME} window')
         self.open_button.clicked.connect(win.show_main)
         self.hide_button = QPushButton('Hide')
-        self.hide_button.setToolTip('Hide the widget. Bring it back from the tray icon or the VassDash window.')
+        self.hide_button.setToolTip(f'Hide the widget. Bring it back from the tray icon or the {brand.NAME} window.')
         self.hide_button.clicked.connect(lambda: self.set_shown(False))
         for button in (self.open_button, self.hide_button):
             button.setObjectName('mini')
@@ -234,14 +235,14 @@ class TimerWidget(QFrame):
 
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
-        menu.addAction('Open VassDash', self.win.show_main)
+        menu.addAction(f'Open {brand.NAME}', self.win.show_main)
         pin = QAction('Always on top', menu, checkable=True)
         pin.setChecked(self.on_top)
         pin.toggled.connect(self.set_on_top)
         menu.addAction(pin)
         menu.addAction('Hide widget', lambda: self.set_shown(False))
         menu.addSeparator()
-        menu.addAction('Quit VassDash', self.win.quit_app)
+        menu.addAction(f'Quit {brand.NAME}', self.win.quit_app)
         menu.exec(event.globalPos())
 
     # ---- timer controls -----------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""VassDash: discounted engineering tracker.
+"""Budget Tracker: discounted engineering tracker.
 
     python app.py            open the window and the desktop timer widget
     python app.py --widget   open only the widget (used by "Start with Windows")
@@ -14,14 +14,14 @@ import sys
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from det import locate
+from det import autostart, locate
 from det.settings import Settings, default_path
 from det.store import Store
 from det.theme import apply_theme
 from det.ui import brand
 from det.ui.main_window import MainWindow
 
-INSTANCE = 'VassDash-single-instance'
+INSTANCE = 'BudgetTracker-single-instance'
 
 
 def already_running() -> bool:
@@ -43,6 +43,7 @@ def main(argv=None) -> int:
     app.setQuitOnLastWindowClosed(False)           # the widget and tray keep the app alive
     if already_running():
         return 0
+    autostart.migrate_legacy()
     settings = Settings(default_path())
     settings.load()
     apply_theme(app, settings.get('theme') or 'dark')

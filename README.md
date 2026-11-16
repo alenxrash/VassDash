@@ -1,17 +1,25 @@
-# VassDash (revision 5)
+# Budget Tracker (revision 6)
 
-VassDash tracks discounted engineering: hours spent beyond a project's quote, costed at a set rate
+Budget Tracker tracks discounted engineering: hours spent beyond a project's quote, costed at a set rate
 (default $220/h), plus dollar amounts carried over from the old Excel sheet. It is a Windows desktop app
 with a timer widget that sits on the desktop. Everyone sees the same screens.
 
 ## Using it
 
-There is nothing to set up. Open `VassDash.exe` and:
+There is nothing to set up. Open `Budget Tracker.exe` and:
 
 1. Pick a project in the timer widget (or type a new name to create one) and press **Start**.
 2. **Pause**, **Resume** and **Stop** from the widget. Stop saves the time.
 
 Or add hours without the timer: on **My time**, choose the project, type the hours and press **Add**.
+
+## What changed in revision 6
+
+- **Renamed to Budget Tracker** (was VassDash), with a new mark and icon. The exe is now
+  `Budget Tracker.exe`. Settings and team data are unchanged and carry over. A "Start with Windows"
+  entry made by the old exe is switched to the new one the first time Budget Tracker starts.
+- **No user profile in the top bar.** The name and initials badge are gone. Your name still comes from
+  Windows and is still recorded on your entries; change it in Settings if needed.
 
 ## What changed in revision 5
 
@@ -48,7 +56,7 @@ from the old sheet, use Settings > Import from Excel. Project data is not part o
 
 1. Install Python 3.10 or newer on a Windows PC.
 2. Double-click `build_exe.bat`. It creates a private build environment, installs the dependencies and
-   produces `dist\VassDash.exe`.
+   produces `dist\Budget Tracker.exe`.
 3. Give that one file to each person.
 
 To run from source: `pip install -r requirements.txt`, then `run_app.bat` (or `python app.py`).

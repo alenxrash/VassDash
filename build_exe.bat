@@ -1,5 +1,5 @@
 @echo off
-rem Builds dist\VassDash.exe. Run in Windows (double-click or Command Prompt).
+rem Builds dist\Budget Tracker.exe. Run in Windows (double-click or Command Prompt).
 setlocal
 cd /d "%~dp0"
 where py >nul 2>nul
@@ -18,10 +18,10 @@ if not exist ".build_env\Scripts\python.exe" (
 if errorlevel 1 goto :failed
 .build_env\Scripts\python.exe -m compileall -q app.py det
 if errorlevel 1 goto :failed
-.build_env\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name "VassDash" --icon "assets\vassdash.ico" app.py
+.build_env\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name "Budget Tracker" --icon "assets\budget-tracker.ico" app.py
 if errorlevel 1 goto :failed
 echo.
-echo Finished: dist\VassDash.exe
+echo Finished: dist\Budget Tracker.exe
 echo Copy that one file to each person. There is nothing to set up: it finds the team folder by itself.
 explorer "%~dp0dist"
 pause

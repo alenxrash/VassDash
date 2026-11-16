@@ -1,4 +1,4 @@
-"""VassDash main window: a top bar with three tabs, and the pieces that outlive it.
+"""Budget Tracker main window: a top bar with three tabs, and the pieces that outlive it.
 
 The timer controller, the desktop widget and the tray icon are owned here but do not depend on the
 window being visible. Closing the window only hides it; the timer keeps running. Quit from the tray
@@ -31,11 +31,6 @@ NAV = [('time', 'My time'), ('dashboard', 'Dashboard'), ('reports', 'Reports')]
 SYNC_MS = 30_000
 
 
-def initials(name: str) -> str:
-    parts = [part for part in name.split() if part]
-    return ''.join(part[0] for part in parts[:2]).upper() or '?'
-
-
 def ask(title: str, text: str, parent=None) -> bool:
     return QMessageBox.question(parent, title, text) == QMessageBox.Yes
 
@@ -61,7 +56,7 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # ---- top bar: brand, tabs, timer, settings, who ----
+        # ---- top bar: brand, tabs, timer, settings ----
         bar_frame = QFrame()
         bar_frame.setObjectName('topbar')
         bar_frame.setFixedHeight(66)
@@ -91,10 +86,7 @@ class MainWindow(QMainWindow):
         self.timer_button.clicked.connect(lambda: self.widget.set_shown(True))
         self.settings_button = QPushButton('Settings')
         self.settings_button.clicked.connect(self.open_settings)
-        self.who = label('', 'muted')
-        self.avatar = label('', 'avatar')
-        self.avatar.setAlignment(Qt.AlignCenter)
-        for widget in (self.timer_button, self.settings_button, self.who, self.avatar):
+        for widget in (self.timer_button, self.settings_button):
             bar.addWidget(widget)
         outer.addWidget(bar_frame)
 
@@ -291,8 +283,6 @@ class MainWindow(QMainWindow):
     def refresh_pages(self) -> None:
         self.brand.setText(f'{brand.NAME}<br><span style="color:{tokens()["text_faint"]}; font-size:11px; '
                            f'font-weight:400;">{brand.TAGLINE}</span>')
-        self.who.setText(self.user)
-        self.avatar.setText(initials(self.user))
         warnings = self.store.warnings
         self.banner.setVisible(bool(warnings or self.offline))
         if self.offline:

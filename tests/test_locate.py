@@ -108,7 +108,7 @@ def test_default_user_name_is_never_blank():
 
 
 def test_autostart_command():
-    assert autostart.launch_command(r'C:\Apps\VassDash.exe', frozen=True) == r'"C:\Apps\VassDash.exe" --widget'
+    assert autostart.launch_command(r'C:\Apps\Budget Tracker.exe', frozen=True) == r'"C:\Apps\Budget Tracker.exe" --widget'
     assert autostart.launch_command('/usr/bin/python3', script='/src/app.py', frozen=False) == \
         '"/usr/bin/python3" "/src/app.py" --widget'
     if not autostart.supported():

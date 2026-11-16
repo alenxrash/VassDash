@@ -1,6 +1,6 @@
 """App theme: every colour and the stylesheet live here. Call apply_theme(app, mode) at startup.
 
-VassDash look: deep navy canvas, rounded cards, pill controls and a blue accent, with a top tab bar.
+Budget Tracker look: deep navy canvas, rounded cards, pill controls and a blue accent, with a top tab bar.
 'dark' is the default; 'light' keeps the same shapes on a pale background.
 """
 from __future__ import annotations
@@ -64,9 +64,6 @@ QLabel#banner { background: $danger_soft; color: $danger; padding: 9px 14px; bor
 QLabel#note { background: $accent_soft; color: $text; padding: 9px 14px; border-radius: 14px; }
 QLabel#chip { background: $surface_alt; color: $text_muted; border: 1px solid $border; border-radius: 13px;
               padding: 4px 12px; }
-QLabel#avatar { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 $accent_hover, stop:1 $glow);
-                color: #FFFFFF; font-weight: 700; border-radius: 19px; min-width: 38px; max-width: 38px;
-                min-height: 38px; max-height: 38px; }
 
 QPushButton { background: $surface_alt; border: 1px solid $border; border-radius: 17px; padding: 7px 16px;
               min-height: 18px; }
