@@ -105,7 +105,7 @@ To run from source: `pip install -r requirements.txt`, then `run_app.bat` (or `p
 
 ## Tested and not tested
 
-Tested (76 automated tests, run on Linux with Python 3.13 and PySide6 6.12): storage, calculations, the
+Tested (78 automated tests, run on Linux with Python 3.13 and PySide6 6.12): storage, calculations, the
 automatic folder search and the move from local to team data (against a simulated Dropbox), the timer,
 the widget as a separate window that survives closing the main window, Excel import, PDF and Excel
 export, and smoke tests of every screen. The app was also launched end to end headless, including
